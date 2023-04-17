@@ -1,0 +1,3 @@
+[submodule "tm4c_os"]
+	path = tm4c_os
+	url = git@github.com:benhaub/tm4c_os.git
