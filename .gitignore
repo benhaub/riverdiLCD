@@ -1,0 +1,15 @@
+../*.pdf
+*.o
+*.elf
+*.bin
+*.map
+*.txt
+*.cfg
+TODO
+BUGS
+.deps
+.bin
+*.bash
+gdb.cmd
+doxygen/latex
+doxygen/html
