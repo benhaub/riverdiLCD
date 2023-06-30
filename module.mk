@@ -1,4 +1,4 @@
-C_SOURCES += ../main.c ../bt81x.c
+C_SOURCES += ../main.c ../Eve2_81x.c ../hw_api.c
 INCLUDES += -I../../include
 #Libs would be include like this:
 #LIBS += -ldriver

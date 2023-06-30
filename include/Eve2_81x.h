@@ -1,14 +1,38 @@
-// Just in case this is for Arduino - Eve wants a DISPLAY() macro and Arduino already defines DISPLAY
-// for something else that we will not be using, so we can kill the Arduino define.
-#undef DISPLAY
+#ifndef __EVE81X_H
+#define __EVE81X_H
+// =====================================================================================
+// Required Functions - Hardware driver or otherwise environment specific. Abstracted  |
+// and found in ArduinoAL.h or whatever the abstraction layer is called in your world. |
+// This library requires base support functions for SPI, delays, and hardware pin      |
+// control.                                                                            |
+// =====================================================================================
+//
+// Delays
+// void MyDelay(uint32_t DLY);
+//
+// Pin control
+// void SetPin(uint8_t, Boolean);
+// void Eve_Reset_HW(void);
+//
+// SPI functions
+// void SPI_Enable(void);
+// void SPI_Disable(void);
+// void SPI_Write(uint8_t data);
+// void SPI_WriteByte(uint8_t data);
+// void SPI_WriteBuffer(uint8_t *Buffer, uint32_t Length);
+// void SPI_ReadBuffer(uint8_t *Buffer, uint32_t Length);
+//
+// #define WorkBuffSz 64 
+//
+// =====================================================================================
+
+#include "tm4c_os.h"
 
 // Once again, if this is being used for Arduino, it wants C++, but C is totally cool as long as it is
-// wrapped in this extern declaration (also see the bottom of the file for the close bracket)
+// wrapped in this extern declaration (also see the bottom of the file for the close bracket)           
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-//#include <stdint.h>              // Find integer types like "uint8_t"
 
 #define HCMD_ACTIVE      0x00
 #define HCMD_STANDBY     0x41
@@ -16,9 +40,9 @@ extern "C" {
 #define HCMD_PWRDOWN     0x50
 #define HCMD_CLKINT      0x48
 #define HCMD_CLKEXT      0x44
-#define HCMD_CLK48M      0x62
-#define HCMD_CLK36M      0x61
-#define HCMD_CORERESET   0x68
+#define HCMD_CLKSLE48M   0x62
+#define HCMD_CLKSEL36M   0x61
+#define HCMD_RST_PULSE   0x68
 
 #define CMD_APPEND           0xFFFFFF1E
 #define CMD_BGCOLOR          0xFFFFFF09
@@ -74,7 +98,7 @@ extern "C" {
 #define CMD_VIDEOFRAME       0xFFFFFF41
 #define CMD_VIDEOSTART       0xFFFFFF40
 #define CMD_ROMFONT          0xFFFFFF3F
-// BT81X COMMANDS
+// BT81X COMMANDS 
 #define CMD_FLASHERASE       0xFFFFFF44
 #define CMD_FLASHWRITE       0xFFFFFF45
 #define CMD_FLASHREAD        0xFFFFFF46
@@ -91,7 +115,7 @@ extern "C" {
 #define CMD_ANIMFRAME        4294967130UL
 #define CMD_ANIMSTART        4294967123UL
 #define CMD_ANIMSTOP         4294967124UL
-#define CMD_ANIMXY           4294967125UL
+#define CMD_ANIMXY           4294967125UL 
 
 #define CMD_FLASHAPPENDF     0xFFFFFF59
 #define CMD_VIDEOSTARTF      0xFFFFFF5F
@@ -147,7 +171,7 @@ extern "C" {
 #define REG_DITHER                0x60
 #define REG_DLSWAP                0x54
 #define REG_HCYCLE                0x2C
-#define REG_HOFFSET               0x30
+#define REG_HOFFSET               0x30    
 #define REG_HSIZE                 0x34
 #define REG_HSYNC0                0x38
 #define REG_HSYNC1                0x3C
@@ -175,7 +199,7 @@ extern "C" {
 #define REG_VOL_PB                0x80
 #define REG_VSYNC0                0x4C
 #define REG_VSYNC1                0x50
-#define REG_VSIZE                 0x48
+#define REG_VSIZE                 0x48 
 
 // Touch Screen Engine Registers - FT81x Series Programmers Guide Section 3.3
 // Addresses defined as offsets from the base address called RAM_REG and located at 0x302000
@@ -192,7 +216,7 @@ extern "C" {
 #define REG_TOUCH_ADC_MODE        0x108
 #define REG_TOUCH_CHARGE          0x10C
 #define REG_TOUCH_DIRECT_XY       0x18C
-#define REG_TOUCH_DIRECT_Z1Z2     0x190
+#define REG_TOUCH_DIRECT_Z1Z2     0x190 
 #define REG_TOUCH_MODE            0x104
 #define REG_TOUCH_OVERSAMPLE      0x114
 #define REG_TOUCH_RAW_XY          0x11C
@@ -234,7 +258,7 @@ extern "C" {
 #define REG_CMDB_WRITE            0x578
 #define REG_COPRO_PATCH_PTR       0x7162
 
-// Special Registers - FT81x Series Programmers Guide Section 3.5
+// Special Registers - FT81x Series Programmers Guide Section 3.5 
 // Addresses assumed to be defined as offsets from the base address called RAM_REG and located at 0x302000
 #define REG_TRACKER               0x7000
 #define REG_TRACKER_1             0x7004
@@ -348,3 +372,80 @@ extern "C" {
 
 // Non FTDI Helper Macros
 #define MAKE_COLOR(r,g,b) (( r << 16) | ( g << 8) | (b))
+
+// Global Variables
+extern uint16_t FifoWriteLocation;
+
+// Function Prototypes
+void FT81x_Init(void);
+void Eve_Reset(void);
+void Cap_Touch_Upload(void);
+
+void HostCommand(uint8_t HostCommand); 
+void wr32(uint32_t address, uint32_t parameter);
+void wr16(uint32_t, uint16_t parameter);
+void wr8(uint32_t, uint8_t parameter);
+uint8_t rd8(uint32_t RegAddr);
+uint16_t rd16(uint32_t RegAddr);
+uint32_t rd32(uint32_t RegAddr);
+void Send_CMD(uint32_t data);
+void UpdateFIFO(void);
+uint8_t Cmd_READ_REG_ID(void);
+
+// Widgets and other significant screen objects
+void Cmd_Slider(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t options, uint16_t val, uint16_t range);
+void Cmd_Spinner(uint16_t x, uint16_t y, uint16_t style, uint16_t scale);
+void Cmd_Gauge(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint16_t major, uint16_t minor, uint16_t val, uint16_t range);
+void Cmd_Dial(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint16_t val);
+void Cmd_Track(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t tag);
+void Cmd_Number(uint16_t x, uint16_t y, uint16_t font, uint16_t options, uint32_t num);
+void Cmd_Gradient(uint16_t x0, uint16_t y0, uint32_t rgb0, uint16_t x1, uint16_t y1, uint32_t rgb1);
+void Cmd_Button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t font, uint16_t options, const char* str);
+void Cmd_Text(uint16_t x, uint16_t y, uint16_t font, uint16_t options, const char* str);
+
+void Cmd_SetBitmap(uint32_t addr, uint16_t fmt, uint16_t width, uint16_t height);
+void Cmd_Memcpy(uint32_t dest, uint32_t src, uint32_t num);
+void Cmd_GetPtr(void);
+void Cmd_GradientColor(uint32_t c);
+void Cmd_FGcolor(uint32_t c);
+void Cmd_BGcolor(uint32_t c);
+void Cmd_Translate(uint32_t tx, uint32_t ty);
+void Cmd_Rotate(uint32_t a);
+void Cmd_SetRotate(uint32_t rotation);
+void Cmd_Scale(uint32_t sx, uint32_t sy);
+void Cmd_Calibrate(uint32_t result);
+void Cmd_Flash_Fast(void);
+
+void Cmd_AnimStart(int32_t ch, uint32_t aoptr, uint32_t loop);
+void Cmd_AnimStop(int32_t ch);
+void Cmd_AnimXY(int32_t ch, int16_t x, int16_t y);
+void Cmd_AnimDraw(int32_t ch);
+void Cmd_AnimDrawFrame(int16_t x, int16_t y, uint32_t aoptr, uint32_t frame);
+
+void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16_t H_Offset);
+
+uint16_t CoProFIFO_FreeSpace(void);
+void Wait4CoProFIFO(uint32_t room);
+void Wait4CoProFIFOEmpty(void);
+void StartCoProTransfer(uint32_t address, uint8_t reading);
+void CoProWrCmdBuf(const uint8_t *buffer, uint32_t count);
+void CoProFaultRecovery();
+uint32_t WriteBlockRAM(uint32_t Add, const uint8_t *buff, uint32_t count);
+int32_t CalcCoef(int32_t Q, int32_t K);
+uint32_t Display_Width();
+uint32_t Display_Height();
+uint8_t Display_Touch();
+uint32_t Display_HOffset();
+uint32_t Display_VOffset();
+
+/* Flash commands */
+_Bool FlashAttach(void);
+_Bool FlashDetach(void);
+_Bool FlashFast(void);
+_Bool FlashErase(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
