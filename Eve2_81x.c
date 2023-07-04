@@ -35,9 +35,12 @@
 // Be aware that Eve stores only the offset into the "FIFO" as 16 bits, so any use of the offset 
 // requires adding the base address (RAM_CMD 0x308000) to the resultant 32 bit value.
 
-#include "include/Eve2_81x.h"            // Header for this file with prototypes, defines, and typedefs
-#include "include/MatrixEve2Conf.h"      // Header for display selection 
-#include "include/hw_api.h"				 // for spi abstraction 
+//Header for this file with prototypes, defines, and typedefs
+#include "include/Eve2_81x.h"
+//Header for display selection 
+#include "include/MatrixEve2Conf.h"
+//For spi abstraction 
+#include "include/hw_api.h"
 
 #define WorkBuffSz 512
 
@@ -45,41 +48,52 @@
 uint16_t FifoWriteLocation;
 char LogBuf[WorkBuffSz];         // The singular universal data array used for all things including logging
 
-// Call this function once at powerup to reset and initialize the Eve chip
-void FT81x_Init(void)
-{  
-  uint8_t Ready = 0;
+/**
+ * @brief
+ *   Call this function once at powerup to reset and initialize the Eve chip
+ * @return
+ *   Chip ID on success, 0 otherwise.
+ */
+uint32_t FT81x_Init(void)
+{
   uint8_t resetStatus = 0;
+  uint32_t chipId;
   FifoWriteLocation = 0;
   
-  Eve_Reset(); // Hard reset of the Eve chip
-
-  // Wakeup Eve
-#if defined(EVE3)
-  HostCommand(HCMD_CLKEXT);
-#endif
-  HostCommand(HCMD_ACTIVE);
   HostCommand(HCMD_RST_PULSE);
+  HAL_Delay(300);
+
+  HostCommand(HCMD_CLKEXT);
+  HostCommand(HCMD_ACTIVE);
   
-  while (!Cmd_READ_REG_ID());
-  printf("Chip ID = %x\n\r", rd32(REG_CHIP_ID));
+  int i = 0;
+  while (!Cmd_READ_REG_ID()) {
+    if (i > 50) {
+      return 0;
+    }
+    i++;
+  }
+
+  chipId = rd32(REG_CHIP_ID);
+
   resetStatus = rd8(RAM_REG + REG_CPU_RESET);
+  i = 0;
   while ((resetStatus &= 0x7) != 0) {
     wr8(RAM_REG + REG_CPU_RESET, resetStatus);
     wr8(RAM_REG + REG_CPU_RESET, 0);
     resetStatus = rd8(RAM_REG + REG_CPU_RESET);
-    //CoProFaultRecovery();
+    if (rd16(REG_CMD_READ + RAM_REG) == 0xFFF)
+      CoProFaultRecovery();
+
+    if (i > 50) {
+      return 0;
+    }
+
+    i++;
   }
 
   wr32(REG_FREQUENCY + RAM_REG, 0x3938700); // Configure the system clock to 60MHz
 
-  // Before we go any further with Eve, it is a good idea to check to see if she is wigging out about something 
-  // that happened before the last reset.  If Eve has just done a power cycle, this would be unnecessary.
-  if( rd16(REG_CMD_READ + RAM_REG) == 0xFFF )
-  {
-    CoProFaultRecovery();
-  }
-  
   // turn off screen output during startup
   wr8(REG_GPIOX + RAM_REG, 0);             // Set REG_GPIOX to 0 to turn off the LCD DISP signal
   wr8(REG_PCLK + RAM_REG, 0);              // Pixel Clock Output disable
@@ -102,33 +116,40 @@ void FT81x_Init(void)
   wr8(REG_DITHER + RAM_REG, DITHER);          // Set DITHER to 1     (32 bit register - write only 8 bits)
 
   // configure touch & audio
-  #ifdef TOUCH_RESISTIVE
+#ifdef TOUCH_RESISTIVE
 	wr16(REG_TOUCH_CONFIG + RAM_REG, 0x8381);
-  #elif defined TOUCH_CAPACITIVE
+#elif defined TOUCH_CAPACITIVE
 	wr16(REG_TOUCH_CONFIG + RAM_REG, 0x5d0);
+#endif
 #ifdef EVE2
 	Cap_Touch_Upload();
 #endif
-  #endif
-
-  wr16(REG_TOUCH_RZTHRESH + RAM_REG, 1200);          // set touch resistance threshold
-  wr8(REG_TOUCH_MODE + RAM_REG, 0x02);               // set touch on: continous - this is default
-  wr8(REG_TOUCH_ADC_MODE + RAM_REG, 0x01);           // set ADC mode: differential - this is default
-  wr8(REG_TOUCH_OVERSAMPLE + RAM_REG, 15);           // set touch oversampling to max
-
-  wr16(REG_GPIOX_DIR + RAM_REG, 0x8000);             // Set Disp GPIO Direction 
-  wr16(REG_GPIOX + RAM_REG, 0x8000);                 // Enable Disp (if used)
-
-  wr16(REG_PWM_HZ + RAM_REG, 0x00FA);                // Backlight PWM frequency
-  wr8(REG_PWM_DUTY + RAM_REG, 128);                  // Backlight PWM duty (on)   
+  //set touch resistance threshold
+  wr16(REG_TOUCH_RZTHRESH + RAM_REG, 1200);
+  //set touch on: continous - this is default
+  wr8(REG_TOUCH_MODE + RAM_REG, 0x02);
+  //set ADC mode: differential - this is default
+  wr8(REG_TOUCH_ADC_MODE + RAM_REG, 0x01);
+  //set touch oversampling to max
+  wr8(REG_TOUCH_OVERSAMPLE + RAM_REG, 15);
+  //Set Disp GPIO Direction 
+  wr16(REG_GPIOX_DIR + RAM_REG, 0x8000);
+  //Enable Disp (if used). Display is visible after this
+  wr16(REG_GPIOX + RAM_REG, 0x8000);
+  //Backlight PWM frequency
+  wr16(REG_PWM_HZ + RAM_REG, 0x00FA);
+  //Backlight PWM duty (on)   
+  wr8(REG_PWM_DUTY + RAM_REG, 128);
 
   // write first display list (which is a clear and blank screen)
   wr32(RAM_DL+0, CLEAR_COLOR_RGB(0,0,0));
   wr32(RAM_DL+4, CLEAR(1,1,1));
   wr32(RAM_DL+8, DISPLAY());
-  wr8(REG_DLSWAP + RAM_REG, DLSWAP_FRAME);          // swap display lists
-  wr8(REG_PCLK + RAM_REG, PCLK);                       // after this display is visible on the LCD
+  //swap display lists
+  wr8(REG_DLSWAP + RAM_REG, DLSWAP_FRAME);
+  wr8(REG_PCLK + RAM_REG, PCLK);
 
+  return chipId;
 }
 
 // Reset Eve chip via the hardware PDN line
@@ -314,7 +335,6 @@ uint8_t Cmd_READ_REG_ID(void)
   HAL_SPI_Write(REG_ID);
   //Dummy byte
   HAL_SPI_Write(0x00);
-  //There was a dummy read of the first byte in there   
   HAL_SPI_ReadBuffer(readData, 1);
   HAL_SPI_Disable();
   //FT81x Datasheet section 5.1, Table 5-2. Return value always 0x7C
@@ -716,10 +736,12 @@ void Wait4CoProFIFO(uint32_t room)
 void Wait4CoProFIFOEmpty(void)
 {
   uint16_t ReadReg = 0;
+  uint16_t WriteReg = 0;
   uint8_t ErrChar;
   do
   {
     ReadReg = rd16(REG_CMD_READ + RAM_REG);
+    WriteReg = rd16(REG_CMD_WRITE + RAM_REG);
     if(ReadReg == 0xFFF)
     {
       // this is a error which would require sophistication to fix and continue but we fake it somewhat unsuccessfully
@@ -734,7 +756,7 @@ void Wait4CoProFIFOEmpty(void)
       CoProFaultRecovery();
       HAL_Delay(250);  // we already saw one error message and we don't need to see then 1000 times a second
     }
-  }while( ReadReg != rd16(REG_CMD_WRITE + RAM_REG) );
+  }while( ReadReg != WriteReg);
 }
 
 // Every CoPro transaction starts with enabling the SPI and sending an address

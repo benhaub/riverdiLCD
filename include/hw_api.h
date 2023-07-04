@@ -5,7 +5,9 @@ extern "C" {
 #endif
 
 #include <stdint.h>              
-#include <stdbool.h>            
+#include <stdbool.h>
+
+#define PIN_NUMBER 3
 
 void HAL_SPI_Enable(void);
 void HAL_SPI_Disable(void);
@@ -15,6 +17,7 @@ void HAL_SPI_WriteBuffer(uint8_t *Buffer, uint32_t Length);
 void HAL_SPI_ReadBuffer(uint8_t *Buffer, uint32_t Length);
 void HAL_Delay(uint32_t milliseconds);
 void HAL_Eve_Reset_HW(void);
+void HAL_Open(void);
 void HAL_Close(void);
 
 #ifdef __cplusplus

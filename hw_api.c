@@ -2,12 +2,10 @@
 #include "tm4c_os.h"
 
 void HAL_SPI_Enable(void) {
-  const uint8_t pinNumber = 3;
-  gpio(GPIO_PORTE, pinNumber, GPIO_STATE_OFF);
+  gpio(GPIO_PORTE, PIN_NUMBER, GPIO_STATE_OFF);
 }
 void HAL_SPI_Disable(void) {
-  const uint8_t pinNumber = 3;
-  gpio(GPIO_PORTE, pinNumber, GPIO_STATE_ON);
+  gpio(GPIO_PORTE, PIN_NUMBER, GPIO_STATE_ON);
 }
 uint8_t HAL_SPI_Write(uint8_t data) {
   spi(SPI_TRANSMIT, &data);
@@ -29,8 +27,10 @@ void HAL_Delay(uint32_t milliseconds) {
   delay(milliseconds);
 }
 void HAL_Eve_Reset_HW(void) {
-  const uint8_t pinNumber = 2;
-  gpio(GPIO_PORTE, 2, GPIO_STATE_OFF);
-  gpio(GPIO_PORTE, 2, GPIO_STATE_ON);
+  gpio(GPIO_PORTE, PIN_NUMBER, GPIO_STATE_OFF);
+  gpio(GPIO_PORTE, PIN_NUMBER, GPIO_STATE_ON);
+}
+void HAL_Open(void) {
+  HAL_SPI_Disable();
 }
 void HAL_Close(void) {}

@@ -377,7 +377,7 @@ extern "C" {
 extern uint16_t FifoWriteLocation;
 
 // Function Prototypes
-void FT81x_Init(void);
+uint32_t FT81x_Init(void);
 void Eve_Reset(void);
 void Cap_Touch_Upload(void);
 
