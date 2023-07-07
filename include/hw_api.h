@@ -7,7 +7,16 @@ extern "C" {
 #include <stdint.h>              
 #include <stdbool.h>
 
-#define PIN_NUMBER 3
+/**
+ * @def CS_PIN_NUMBER
+ *   GPIO pin number to control SPI chip select.
+ */
+#define CS_PIN_NUMBER 3
+/**
+ * @def PD_PIN_NUMBER
+ *   GPIO pin number to control bt81x powerdown.
+ */
+#define PD_PIN_NUMBER 2
 
 void HAL_SPI_Enable(void);
 void HAL_SPI_Disable(void);

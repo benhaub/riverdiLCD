@@ -378,7 +378,6 @@ extern uint16_t FifoWriteLocation;
 
 // Function Prototypes
 uint32_t FT81x_Init(void);
-void Eve_Reset(void);
 void Cap_Touch_Upload(void);
 
 void HostCommand(uint8_t HostCommand); 

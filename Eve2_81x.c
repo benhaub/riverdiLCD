@@ -60,11 +60,12 @@ uint32_t FT81x_Init(void)
   uint32_t chipId;
   FifoWriteLocation = 0;
   
-  HostCommand(HCMD_RST_PULSE);
-  HAL_Delay(300);
-
+  HAL_Eve_Reset_HW();
+  
+  //HostCommand(HCMD_RST_PULSE);
   HostCommand(HCMD_CLKEXT);
   HostCommand(HCMD_ACTIVE);
+  HAL_Delay(300);
   
   int i = 0;
   while (!Cmd_READ_REG_ID()) {
@@ -74,7 +75,11 @@ uint32_t FT81x_Init(void)
     i++;
   }
 
+  printf("RegID read sucessfully\n\r");
+
   chipId = rd32(REG_CHIP_ID);
+  //Configure the system clock to 60MHz
+  wr32(REG_FREQUENCY + RAM_REG, 0x3938700);
 
   resetStatus = rd8(RAM_REG + REG_CPU_RESET);
   i = 0;
@@ -92,7 +97,7 @@ uint32_t FT81x_Init(void)
     i++;
   }
 
-  wr32(REG_FREQUENCY + RAM_REG, 0x3938700); // Configure the system clock to 60MHz
+  printf("EVE is in working status. Configuring display\n\r");
 
   // turn off screen output during startup
   wr8(REG_GPIOX + RAM_REG, 0);             // Set REG_GPIOX to 0 to turn off the LCD DISP signal
@@ -150,12 +155,6 @@ uint32_t FT81x_Init(void)
   wr8(REG_PCLK + RAM_REG, PCLK);
 
   return chipId;
-}
-
-// Reset Eve chip via the hardware PDN line
-void Eve_Reset(void)
-{
-  HAL_Eve_Reset_HW();
 }
 
 // Upload Goodix Calibration file
@@ -333,8 +332,6 @@ uint8_t Cmd_READ_REG_ID(void)
   HAL_SPI_Write(0x20);
   //REG_ID offset = 0x00   
   HAL_SPI_Write(REG_ID);
-  //Dummy byte
-  HAL_SPI_Write(0x00);
   HAL_SPI_ReadBuffer(readData, 1);
   HAL_SPI_Disable();
   //FT81x Datasheet section 5.1, Table 5-2. Return value always 0x7C
