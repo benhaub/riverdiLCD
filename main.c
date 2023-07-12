@@ -45,7 +45,7 @@ void startupScreen(uint8_t DotSize)
 // A calibration screen for the touch digitizer 
 void Calibrate(void)
 {
-	//Calibrate_Manual(DWIDTH, DHEIGHT, PIXVOFFSET, PIXHOFFSET);
+	Calibrate_Manual(DWIDTH, DHEIGHT, PIXVOFFSET, PIXHOFFSET);
 }
 
 // A Clear screen function 

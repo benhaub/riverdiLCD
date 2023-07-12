@@ -9,9 +9,11 @@ void HAL_SPI_Disable(void) {
 }
 uint8_t HAL_SPI_Write(uint8_t data) {
   spi(SPI_TRANSMIT, &data);
+  return 0;
 }
 uint8_t HAL_SPI_WriteByte(uint8_t data) {
   spi(SPI_TRANSMIT, &data);
+  return 0;
 }
 void HAL_SPI_WriteBuffer(uint8_t *Buffer, uint32_t Length) {
   for (int i = 0; i < Length; i++) {
@@ -28,7 +30,8 @@ void HAL_Delay(uint32_t milliseconds) {
 }
 void HAL_Eve_Reset_HW(void) {
   gpio(GPIO_PORTE, PD_PIN_NUMBER, GPIO_STATE_OFF);
-  HAL_Delay(1);
+  //Minimum time for PD to be held low is 5ms. Sect. 4.9.2
+  HAL_Delay(6);
   gpio(GPIO_PORTE, PD_PIN_NUMBER, GPIO_STATE_ON);
 }
 void HAL_Open(void) {

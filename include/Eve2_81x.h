@@ -380,7 +380,7 @@ extern uint16_t FifoWriteLocation;
 uint32_t FT81x_Init(void);
 void Cap_Touch_Upload(void);
 
-void HostCommand(uint8_t HostCommand); 
+void HostCommand(uint8_t HostCommand, uint8_t parameter); 
 void wr32(uint32_t address, uint32_t parameter);
 void wr16(uint32_t, uint16_t parameter);
 void wr8(uint32_t, uint8_t parameter);

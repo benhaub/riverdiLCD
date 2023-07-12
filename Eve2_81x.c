@@ -41,12 +41,12 @@
 #include "include/MatrixEve2Conf.h"
 //For spi abstraction 
 #include "include/hw_api.h"
+//For touch calibration
+#include "include/touch_cap_811.h"
 
 #define WorkBuffSz 512
 
-// Global Variables 
 uint16_t FifoWriteLocation;
-char LogBuf[WorkBuffSz];         // The singular universal data array used for all things including logging
 
 /**
  * @brief
@@ -59,17 +59,24 @@ uint32_t FT81x_Init(void)
   uint8_t resetStatus = 0;
   uint32_t chipId;
   FifoWriteLocation = 0;
-  
+ 
+  //Powerdown state.
   HAL_Eve_Reset_HW();
-  
-  //HostCommand(HCMD_RST_PULSE);
-  HostCommand(HCMD_CLKEXT);
-  HostCommand(HCMD_ACTIVE);
-  HAL_Delay(300);
+
+  //Sleep state.
+#if MATRIX_ORBITAL_EVE_35
+  HostCommand(HCMD_CLKEXT, 0);
+  HostCommand(HCMD_ACTIVE, 0);
+#elif RIVERDI_EVE_35
+  HostCommand(HCMD_CLKEXT, 0);
+  HostCommand(HCMD_CLKSEL36M, 0x46);
+  HostCommand(HCMD_ACTIVE, 0);
+#endif
+
   
   int i = 0;
   while (!Cmd_READ_REG_ID()) {
-    if (i > 50) {
+    if (i > 500) {
       return 0;
     }
     i++;
@@ -78,8 +85,6 @@ uint32_t FT81x_Init(void)
   printf("RegID read sucessfully\n\r");
 
   chipId = rd32(REG_CHIP_ID);
-  //Configure the system clock to 60MHz
-  wr32(REG_FREQUENCY + RAM_REG, 0x3938700);
 
   resetStatus = rd8(RAM_REG + REG_CPU_RESET);
   i = 0;
@@ -90,7 +95,7 @@ uint32_t FT81x_Init(void)
     if (rd16(REG_CMD_READ + RAM_REG) == 0xFFF)
       CoProFaultRecovery();
 
-    if (i > 50) {
+    if (i > 500) {
       return 0;
     }
 
@@ -158,42 +163,40 @@ uint32_t FT81x_Init(void)
 }
 
 // Upload Goodix Calibration file
-//void Cap_Touch_Upload(void)
-//{
-//	//---Goodix911 Configuration from AN336
-//	//Load the TOUCH_DATA_U8 or TOUCH_DATA_U32 array from file “touch_cap_811.h” via the FT81x command buffer RAM_CMD
-//	uint8_t CTOUCH_CONFIG_DATA_G911[] = { TOUCH_DATA_U8 };
-//	CoProWrCmdBuf(CTOUCH_CONFIG_DATA_G911, TOUCH_DATA_LEN);
-//	//Execute the commands till completion
-//	UpdateFIFO();
-//	Wait4CoProFIFOEmpty();	
-//	//Hold the touch engine in reset(write REG_CPURESET = 2)
-//	wr8(REG_CPU_RESET + RAM_REG, 2);
-//	//Set GPIO3 output LOW		
-//	wr8(REG_GPIOX_DIR + RAM_REG, (rd8(RAM_REG + REG_GPIOX_DIR) | 0x08)); // Set Disp GPIO Direction 
-//	wr8(REG_GPIOX + RAM_REG, (rd8(RAM_REG + REG_GPIOX) | 0xF7));         // Clear GPIO
-//	//Wait more than 100us
-//	HAL_Delay(1);
-//	//Write REG_CPURESET=0
-//	wr8(REG_CPU_RESET + RAM_REG, 0);
-//	//Wait more than 55ms
-//	HAL_Delay(100);
-//	//Set GPIO3 to input (floating)			
-//	wr8(REG_GPIOX_DIR + RAM_REG, (rd8(RAM_REG + REG_GPIOX_DIR) & 0xF7));             // Set Disp GPIO Direction 
-//																		 //---Goodix911 Configuration from AN336
-//}
+void Cap_Touch_Upload(void)
+{
+	//---Goodix911 Configuration from AN336
+	//Load the TOUCH_DATA_U8 or TOUCH_DATA_U32 array from file “touch_cap_811.h” via the FT81x command buffer RAM_CMD
+	uint8_t CTOUCH_CONFIG_DATA_G911[] = { TOUCH_DATA_U8 };
+	CoProWrCmdBuf(CTOUCH_CONFIG_DATA_G911, TOUCH_DATA_LEN);
+	//Execute the commands till completion
+	UpdateFIFO();
+	Wait4CoProFIFOEmpty();	
+	//Hold the touch engine in reset(write REG_CPURESET = 2)
+	wr8(REG_CPU_RESET + RAM_REG, 2);
+	//Set GPIO3 output LOW		
+	wr8(REG_GPIOX_DIR + RAM_REG, (rd8(RAM_REG + REG_GPIOX_DIR) | 0x08)); // Set Disp GPIO Direction 
+	wr8(REG_GPIOX + RAM_REG, (rd8(RAM_REG + REG_GPIOX) | 0xF7));         // Clear GPIO
+	//Wait more than 100us
+	HAL_Delay(1);
+	//Write REG_CPURESET=0
+	wr8(REG_CPU_RESET + RAM_REG, 0);
+	//Wait more than 55ms
+	HAL_Delay(100);
+	//Set GPIO3 to input (floating)			
+	wr8(REG_GPIOX_DIR + RAM_REG, (rd8(RAM_REG + REG_GPIOX_DIR) & 0xF7));             // Set Disp GPIO Direction 
+																		 //---Goodix911 Configuration from AN336
+}
 
 // *** Host Command - FT81X Embedded Video Engine Datasheet - 4.1.5 **********************************************
 // Host Command is a function for changing hardware related parameters of the Eve chip.  The name is confusing.
 // These are related to power modes and the like.  All defined parameters have HCMD_ prefix
-void HostCommand(uint8_t HCMD) 
+void HostCommand(uint8_t HCMD, uint8_t parameter) 
 {
-
   HAL_SPI_Enable();
   
-/*  HAL_SPI_Write(HCMD | 0x40); // In case the manual is making you believe that you just found the bug you were looking for - no. */       
   HAL_SPI_Write(HCMD);        
-  HAL_SPI_Write(0x00);          // This second byte is set to 0 but if there is need for fancy, never used setups, then rewrite.  
+  HAL_SPI_Write(parameter);
   HAL_SPI_Write(0x00);   
   
   HAL_SPI_Disable();
@@ -571,97 +574,99 @@ void Cmd_Calibrate(uint32_t result)
 
 // An interactive calibration screen is created and executed.  
 // New calibration values are written to the touch matrix registers of Eve.
-//void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16_t H_Offset)
-//{
-//  uint32_t displayX[3], displayY[3];
-//  uint32_t touchX[3], touchY[3]; 
-//  uint32_t touchValue = 0, storedValue = 0;  
-//  int32_t tmp, k;
-//  int32_t TransMatrix[6];
-//  uint8_t count = 0;
-//  uint8_t pressed = 0;
-//  char num[2];
-//
-//  // These values determine where your calibration points will be drawn on your display
-//  displayX[0] = (uint32_t) (Width * 0.15) + H_Offset;
-//  displayY[0] = (uint32_t) (Height * 0.15) + V_Offset;
-//  
-//  displayX[1] = (uint32_t) (Width * 0.85) + H_Offset;
-//  displayY[1] = (uint32_t) (Height / 2) + V_Offset;
-//  
-//  displayX[2] = (uint32_t) (Width / 2) + H_Offset;
-//  displayY[2] = (uint32_t) (Height * 0.85) + V_Offset;
-//
-//  while (count < 3) 
-//  {
-//    Send_CMD(CMD_DLSTART);
-//    Send_CMD(CLEAR_COLOR_RGB(0, 0, 0));	
-//    Send_CMD(CLEAR(1,1,1));
-//
-//    // Draw Calibration Point on screen
-//    Send_CMD(COLOR_RGB(255, 0, 0));
-//    Send_CMD(POINT_SIZE(20 * 16));
-//    Send_CMD(BEGIN(POINTS));
-//    Send_CMD(VERTEX2F((uint32_t)(displayX[count]) * 16, (uint32_t)((displayY[count])) * 16)); 
-//    Send_CMD(END());
-//    Send_CMD(COLOR_RGB(255, 255, 255));
-//    Cmd_Text((Width / 2) + H_Offset, (Height / 3) + V_Offset, 27, OPT_CENTER, "Calibrating");
-//    Cmd_Text((Width / 2) + H_Offset, (Height / 2) + V_Offset, 27, OPT_CENTER, "Please tap the dots");
-//    num[0] = count + 0x31; num[1] = 0;                                            // null terminated string of one character
-//    Cmd_Text(displayX[count], displayY[count], 27, OPT_CENTER, num);
-//
-//    Send_CMD(DISPLAY());
-//    Send_CMD(CMD_SWAP);
-//    UpdateFIFO();                                                                 // Trigger the CoProcessor to start processing commands out of the FIFO
-//    Wait4CoProFIFOEmpty();                                                        // wait here until the coprocessor has read and executed every pending command.
-//    HAL_Delay(300);
-//
-//	while (pressed == count)
-//	{
-//		touchValue = rd32(REG_TOUCH_DIRECT_XY + RAM_REG);                             // Read for any new touch tag inputs
-//		if (!(touchValue & 0x80000000))
-//		{
-//			touchX[count] = (touchValue >> 16) & 0x03FF;                                  // Raw Touchscreen Y coordinate
-//			touchY[count] = touchValue & 0x03FF;                                        // Raw Touchscreen Y coordinate
-//
-//			count++;
-//		}
-//	}
-//	pressed = count;
-//
-//  }
-//
-//  k = ((touchX[0] - touchX[2])*(touchY[1] - touchY[2])) - ((touchX[1] - touchX[2])*(touchY[0] - touchY[2]));
-//
-//  tmp = (((displayX[0] - displayX[2]) * (touchY[1] - touchY[2])) - ((displayX[1] - displayX[2])*(touchY[0] - touchY[2])));
-//  TransMatrix[0] = ((int64_t)tmp << 16) / k;
-//
-//  tmp = (((touchX[0] - touchX[2]) * (displayX[1] - displayX[2])) - ((displayX[0] - displayX[2])*(touchX[1] - touchX[2])));
-//  TransMatrix[1] = ((int64_t)tmp << 16) / k;
-//
-//  tmp = ((touchY[0] * (((touchX[2] * displayX[1]) - (touchX[1] * displayX[2])))) + (touchY[1] * (((touchX[0] * displayX[2]) - (touchX[2] * displayX[0])))) + (touchY[2] * (((touchX[1] * displayX[0]) - (touchX[0] * displayX[1])))));
-//  TransMatrix[2] = ((int64_t)tmp << 16) / k;
-//
-//  tmp = (((displayY[0] - displayY[2]) * (touchY[1] - touchY[2])) - ((displayY[1] - displayY[2])*(touchY[0] - touchY[2])));
-//  TransMatrix[3] = ((int64_t)tmp << 16) / k;
-//
-//  tmp = (((touchX[0] - touchX[2]) * (displayY[1] - displayY[2])) - ((displayY[0] - displayY[2])*(touchX[1] - touchX[2])));
-//  TransMatrix[4] = ((int64_t)tmp << 16) / k;
-//
-//  tmp = ((touchY[0] * (((touchX[2] * displayY[1]) - (touchX[1] * displayY[2])))) + (touchY[1] * (((touchX[0] * displayY[2]) - (touchX[2] * displayY[0])))) + (touchY[2] * (((touchX[1] * displayY[0]) - (touchX[0] * displayY[1])))));
-//  TransMatrix[5] = ((int64_t)tmp << 16) / k;
-//  
-//  count = 0;
-//  do
-//  {
-//    wr32(REG_TOUCH_TRANSFORM_A + RAM_REG + (count * 4), TransMatrix[count]);  // Write to Eve config registers
-//
-////    uint16_t ValH = TransMatrix[count] >> 16;
-////    uint16_t ValL = TransMatrix[count] & 0xFFFF;
-//    
-//    count++;
-//  }while(count < 6);
-//}
+void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16_t H_Offset)
+{
+  uint32_t displayX[3], displayY[3];
+  uint32_t touchX[3], touchY[3]; 
+  uint32_t touchValue = 0, storedValue = 0;  
+  int32_t tmp, k;
+  int32_t TransMatrix[6];
+  uint8_t count = 0;
+  uint8_t pressed = 0;
+  char num[2];
+
+  // These values determine where your calibration points will be drawn on your display
+  displayX[0] = (uint32_t) (Width * 0.15) + H_Offset;
+  displayY[0] = (uint32_t) (Height * 0.15) + V_Offset;
+  
+  displayX[1] = (uint32_t) (Width * 0.85) + H_Offset;
+  displayY[1] = (uint32_t) (Height / 2) + V_Offset;
+  
+  displayX[2] = (uint32_t) (Width / 2) + H_Offset;
+  displayY[2] = (uint32_t) (Height * 0.85) + V_Offset;
+
+  while (count < 3) 
+  {
+    Send_CMD(CMD_DLSTART);
+    Send_CMD(CLEAR_COLOR_RGB(0, 0, 0));	
+    Send_CMD(CLEAR(1,1,1));
+
+    // Draw Calibration Point on screen
+    Send_CMD(COLOR_RGB(255, 0, 0));
+    Send_CMD(POINT_SIZE(20 * 16));
+    Send_CMD(BEGIN(POINTS));
+    Send_CMD(VERTEX2F((uint32_t)(displayX[count]) * 16, (uint32_t)((displayY[count])) * 16)); 
+    Send_CMD(END());
+    Send_CMD(COLOR_RGB(255, 255, 255));
+    Cmd_Text((Width / 2) + H_Offset, (Height / 3) + V_Offset, 27, OPT_CENTER, "Calibrating");
+    Cmd_Text((Width / 2) + H_Offset, (Height / 2) + V_Offset, 27, OPT_CENTER, "Please tap the dots");
+    num[0] = count + 0x31; num[1] = 0;                                            // null terminated string of one character
+    Cmd_Text(displayX[count], displayY[count], 27, OPT_CENTER, num);
+
+    Send_CMD(DISPLAY());
+    Send_CMD(CMD_SWAP);
+    // Trigger the CoProcessor to start processing commands out of the FIFO
+    UpdateFIFO();
+    // wait here until the coprocessor has read and executed every pending command.
+    Wait4CoProFIFOEmpty();
+
+    while (pressed == count)
+    {
+      touchValue = rd32(REG_TOUCH_DIRECT_XY + RAM_REG);                             // Read for any new touch tag inputs
+      if (!(touchValue & 0x80000000))
+      {
+        touchX[count] = (touchValue >> 16) & 0x03FF;                                  // Raw Touchscreen Y coordinate
+        touchY[count] = touchValue & 0x03FF;                                        // Raw Touchscreen Y coordinate
+
+        count++;
+      }
+    }
+    pressed = count;
+
+  }
+
+  k = ((touchX[0] - touchX[2])*(touchY[1] - touchY[2])) - ((touchX[1] - touchX[2])*(touchY[0] - touchY[2]));
+
+  tmp = (((displayX[0] - displayX[2]) * (touchY[1] - touchY[2])) - ((displayX[1] - displayX[2])*(touchY[0] - touchY[2])));
+
+  TransMatrix[0] = (tmp << 16) / k;
+
+  tmp = (((touchX[0] - touchX[2]) * (displayX[1] - displayX[2])) - ((displayX[0] - displayX[2])*(touchX[1] - touchX[2])));
+  TransMatrix[1] = (tmp << 16) / k;
+
+  tmp = ((touchY[0] * (((touchX[2] * displayX[1]) - (touchX[1] * displayX[2])))) + (touchY[1] * (((touchX[0] * displayX[2]) - (touchX[2] * displayX[0])))) + (touchY[2] * (((touchX[1] * displayX[0]) - (touchX[0] * displayX[1])))));
+  TransMatrix[2] = (tmp << 16) / k;
+
+  tmp = (((displayY[0] - displayY[2]) * (touchY[1] - touchY[2])) - ((displayY[1] - displayY[2])*(touchY[0] - touchY[2])));
+  TransMatrix[3] = (tmp << 16) / k;
+
+  tmp = (((touchX[0] - touchX[2]) * (displayY[1] - displayY[2])) - ((displayY[0] - displayY[2])*(touchX[1] - touchX[2])));
+  TransMatrix[4] = (tmp << 16) / k;
+
+  tmp = ((touchY[0] * (((touchX[2] * displayY[1]) - (touchX[1] * displayY[2])))) + (touchY[1] * (((touchX[0] * displayY[2]) - (touchX[2] * displayY[0])))) + (touchY[2] * (((touchX[1] * displayY[0]) - (touchX[0] * displayY[1])))));
+  TransMatrix[5] = (tmp << 16) / k;
+  
+  count = 0;
+  do
+  {
+    wr32(REG_TOUCH_TRANSFORM_A + RAM_REG + (count * 4), TransMatrix[count]);  // Write to Eve config registers
+
+    uint16_t ValH = TransMatrix[count] >> 16;
+    uint16_t ValL = TransMatrix[count] & 0xFFFF;
+    
+    count++;
+  }while(count < 6);
+}
 // ***************************************************************************************************************
 // *** Animation functions ***************************************************************************************
 // ***************************************************************************************************************
