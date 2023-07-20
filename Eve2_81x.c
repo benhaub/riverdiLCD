@@ -72,10 +72,13 @@ uint32_t FT81x_Init(void)
   HostCommand(HCMD_CLKSEL36M, 0x46);
   HostCommand(HCMD_ACTIVE, 0);
 #endif
+  //Sect. 4.9.4, Bt81x Datasheet. May take up to 300ms before software can
+  //access registers or ram from the sleep state.
+  HAL_Delay(300);
 
-  
+  //Active state. Read RegID.
   int i = 0;
-  while (!Cmd_READ_REG_ID()) {
+  while (!readRegId()) {
     if (i > 500) {
       return 0;
     }
@@ -84,6 +87,9 @@ uint32_t FT81x_Init(void)
 
   printf("RegID read sucessfully\n\r");
 
+  //TODO: Should only have to read the chip ID once.
+  chipId = rd32(REG_CHIP_ID);
+  chipId = rd32(REG_CHIP_ID);
   chipId = rd32(REG_CHIP_ID);
 
   resetStatus = rd8(RAM_REG + REG_CPU_RESET);
@@ -325,27 +331,31 @@ void UpdateFIFO(void)
 }
 
 // Read the specific ID register and return TRUE if it is the expected 0x7C otherwise.
-uint8_t Cmd_READ_REG_ID(void)
+bool readRegId(void)
 {
   uint8_t readData[2];
   
   HAL_SPI_Enable();
+
   //Base address RAM_REG = 0x302000
   HAL_SPI_Write(0x30);
   HAL_SPI_Write(0x20);
-  //REG_ID offset = 0x00   
   HAL_SPI_Write(REG_ID);
+
+  //When reading reg ID at startup the bt81x sends some data before the 0x7C
+  //so we need to do some reads until we get 0x7C.
   HAL_SPI_ReadBuffer(readData, 1);
+  while (0 != readData[0] && readData[0] != 0x7C) {
+    HAL_SPI_ReadBuffer(readData, 1);
+  }
+
   HAL_SPI_Disable();
+
   //FT81x Datasheet section 5.1, Table 5-2. Return value always 0x7C
-  if (readData[0] == 0x7C)
-  {
-    return 1;
-  }
+  if (0x7C == readData[0])
+    return true;
   else
-  {
-    return 0;
-  }
+    return false;
 }
 
 // **************************************** Co-Processor/GPU/FIFO/Command buffer Command Functions ***************
@@ -601,7 +611,7 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
     Send_CMD(CLEAR_COLOR_RGB(0, 0, 0));	
     Send_CMD(CLEAR(1,1,1));
 
-    // Draw Calibration Point on screen
+    //Draw Calibration Point on screen
     Send_CMD(COLOR_RGB(255, 0, 0));
     Send_CMD(POINT_SIZE(20 * 16));
     Send_CMD(BEGIN(POINTS));
@@ -610,25 +620,29 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
     Send_CMD(COLOR_RGB(255, 255, 255));
     Cmd_Text((Width / 2) + H_Offset, (Height / 3) + V_Offset, 27, OPT_CENTER, "Calibrating");
     Cmd_Text((Width / 2) + H_Offset, (Height / 2) + V_Offset, 27, OPT_CENTER, "Please tap the dots");
-    num[0] = count + 0x31; num[1] = 0;                                            // null terminated string of one character
+    //null terminated string of one character
+    num[0] = count + 0x31; num[1] = 0;
     Cmd_Text(displayX[count], displayY[count], 27, OPT_CENTER, num);
 
     Send_CMD(DISPLAY());
     Send_CMD(CMD_SWAP);
-    // Trigger the CoProcessor to start processing commands out of the FIFO
+    //Trigger the CoProcessor to start processing commands out of the FIFO
     UpdateFIFO();
-    // wait here until the coprocessor has read and executed every pending command.
+    //wait here until the coprocessor has read and executed every pending command.
     Wait4CoProFIFOEmpty();
 
     while (pressed == count)
     {
-      touchValue = rd32(REG_TOUCH_DIRECT_XY + RAM_REG);                             // Read for any new touch tag inputs
+      //Read for any new touch tag inputs
+      touchValue = rd32(REG_TOUCH_DIRECT_XY + RAM_REG);
       if (!(touchValue & 0x80000000))
       {
-        touchX[count] = (touchValue >> 16) & 0x03FF;                                  // Raw Touchscreen Y coordinate
-        touchY[count] = touchValue & 0x03FF;                                        // Raw Touchscreen Y coordinate
+        //Raw Touchscreen Y coordinate
+        touchX[count] = (touchValue >> 16) & 0x03FF;
+        //Raw Touchscreen Y coordinate
+        touchY[count] = touchValue & 0x03FF;
 
-        count++;
+      count++;
       }
     }
     pressed = count;

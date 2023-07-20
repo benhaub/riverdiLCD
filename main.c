@@ -66,12 +66,16 @@ void ClearScreen(void)
 int main()
 {
   uint32_t chipId;
+
   HAL_Open();
+
   //Initialize the EVE graphics controller. Make sure to define which display you are using in the MatrixEveConf.h
   while (!(chipId = FT81x_Init()));
   printf("Chip ID = %x\n\r", chipId);
+
   //Clear any remnants in the RAM
 	ClearScreen();
+
   printf("Done initializing bt81x.\n\r");
 
   //If you are using a touch screen, make sure to define what variant you are

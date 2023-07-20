@@ -389,7 +389,7 @@ uint16_t rd16(uint32_t RegAddr);
 uint32_t rd32(uint32_t RegAddr);
 void Send_CMD(uint32_t data);
 void UpdateFIFO(void);
-uint8_t Cmd_READ_REG_ID(void);
+bool readRegId(void);
 
 // Widgets and other significant screen objects
 void Cmd_Slider(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t options, uint16_t val, uint16_t range);
