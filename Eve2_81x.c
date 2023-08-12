@@ -89,8 +89,6 @@ uint32_t FT81x_Init(void)
 
   //TODO: Should only have to read the chip ID once.
   chipId = rd32(REG_CHIP_ID);
-  chipId = rd32(REG_CHIP_ID);
-  chipId = rd32(REG_CHIP_ID);
 
   resetStatus = rd8(RAM_REG + REG_CPU_RESET);
   i = 0;
@@ -236,7 +234,7 @@ void wr16(uint32_t address, uint16_t parameter)
   HAL_SPI_Write((uint8_t)(address >> 8));           // Next byte of the register address   
   HAL_SPI_Write((uint8_t)address);                  // Low byte of register address - usually just the 1 byte offset
   
-  HAL_SPI_Write((uint8_t)(parameter & 0xff));       // Little endian (yes, it is most significant bit first and least significant byte first)
+  HAL_SPI_Write((uint8_t)(parameter & 0xFF));       // Little endian (yes, it is most significant bit first and least significant byte first)
   HAL_SPI_Write((uint8_t)(parameter >> 8));
   
   HAL_SPI_Disable();
@@ -257,56 +255,58 @@ void wr8(uint32_t address, uint8_t parameter)
 
 uint32_t rd32(uint32_t address)
 {
-  uint8_t buf[4];
+  uint8_t buf[4] = {0,0,0,0};
   uint32_t Data32;
   
   HAL_SPI_Enable();
   
   HAL_SPI_Write((address >> 16) & 0x3F);    
-  HAL_SPI_Write((address >> 8) & 0xff);    
-  HAL_SPI_Write(address & 0xff);
+  HAL_SPI_Write((address >> 8) & 0xFF);    
+  HAL_SPI_Write(address & 0xFF);
   
+  HAL_SPI_ReadBuffer(buf, 4);
+  HAL_SPI_ReadBuffer(buf, 4);
   HAL_SPI_ReadBuffer(buf, 4);
   
   HAL_SPI_Disable();
   
   Data32 = buf[0] + ((uint32_t)buf[1] << 8) + ((uint32_t)buf[2] << 16) + ((uint32_t)buf[3] << 24);
-  return (Data32);  
+  return Data32;  
 }
 
 uint16_t rd16(uint32_t address)
 {
-	uint8_t buf[2] = { 0,0 };
+	uint8_t buf[2] = {0,0};
     
   HAL_SPI_Enable();
   
   HAL_SPI_Write((address >> 16) & 0x3F);    
-  HAL_SPI_Write((address >> 8) & 0xff);    
-  HAL_SPI_Write(address & 0xff);
+  HAL_SPI_Write((address >> 8) & 0xFF);    
+  HAL_SPI_Write(address & 0xFF);
   
   HAL_SPI_ReadBuffer(buf, 2);
   
   HAL_SPI_Disable();
   
   uint16_t Data16 = buf[0] + ((uint16_t)buf[1] << 8);
-  return (Data16);  
+  return Data16;  
 }
 
 uint8_t rd8(uint32_t address)
 {
-  uint8_t buf[1];
+  uint8_t buf[1] = {0};
   
   HAL_SPI_Enable();
   
   HAL_SPI_Write((address >> 16) & 0x3F);
-  HAL_SPI_Write((address >> 8) & 0xff);    
-  HAL_SPI_Write(address & 0xff);
+  HAL_SPI_Write((address >> 8) & 0xFF);    
+  HAL_SPI_Write(address & 0xFF);
   
   HAL_SPI_ReadBuffer(buf, 1);
   
   HAL_SPI_Disable();
   
-  return (buf[0]);  
+  return buf[0];  
 }
 
 // *** Send_Cmd() - this is like cmd() in (some) Eve docs - sends 32 bits but does not update the write pointer ***
@@ -327,10 +327,12 @@ void Send_CMD(uint32_t data)
 // nothing until you tell it that the write position in the FIFO RAM has changed
 void UpdateFIFO(void)
 {
-  wr16(REG_CMD_WRITE + RAM_REG, FifoWriteLocation);               // We manually update the write position pointer
+  //We manually update the write position pointer
+  wr16(REG_CMD_WRITE + RAM_REG, FifoWriteLocation);
 }
 
-// Read the specific ID register and return TRUE if it is the expected 0x7C otherwise.
+// Read the ID register and return TRUE if it is the expected 0x7C, false
+// otherwise.
 bool readRegId(void)
 {
   uint8_t readData[2];
@@ -358,17 +360,20 @@ bool readRegId(void)
     return false;
 }
 
-// **************************************** Co-Processor/GPU/FIFO/Command buffer Command Functions ***************
-// These are discussed in FT81x Series Programmers Guide, starting around section 5.10
-// While display list commands can be sent to the CoPro, these listed commands are specific to it.  They are 
-// mostly widgets like graphs, but also touch related functions like cmd_track() and memory operations. 
-// Essentially, these commands set up parameters for CoPro functions which expand "macros" using those parameters
-// to then write a series of commands into the Display List to create all the primitives which make that widget.
-// ***************************************************************************************************************
+/*
+ * Co-Processor/GPU/FIFO/Command buffer Command Functions
+ * These are discussed in FT81x Series Programmers Guide, starting around
+ * section 5.10. While display list commands can be sent to the CoPro, these
+ * listed commands are specific to it. They are mostly widgets like graphs, but
+ * also touch related functions like cmd_track() and memory operations.
+ * Essentially, these commands set up parameters for CoPro functions which
+ * expand "macros" using those parameters to then write a series of commands
+ * into the Display List to create all the primitives which make that widget.
+ */
 
-// ******************** Screen Object Creation CoProcessor Command Functions ******************************
+/************Screen Object Creation CoProcessor Command Functions**************/
 
-// *** Draw Slider - FT81x Series Programmers Guide Section 5.38 *************************************************
+/******** Draw Slider - FT81x Series Programmers Guide Section 5.38 ***********/
 void Cmd_Slider(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t options, uint16_t val, uint16_t range)
 {
   Send_CMD(CMD_SLIDER);
@@ -553,14 +558,14 @@ void Cmd_Rotate(uint32_t a)
   Send_CMD(a);
 }
 
-// *** Rotate Screen - FT81x Series Programmers Guide Section 5.53 ***********************************************
+// *** Rotate Screen - FT81x Series Programmers Guide Section 5.53 *************
 void Cmd_SetRotate(uint32_t rotation)
 {
   Send_CMD(CMD_SETROTATE);
   Send_CMD(rotation);
 }
 
-// *** Scale Matrix - FT81x Series Programmers Guide Section 5.49 ************************************************
+// *** Scale Matrix - FT81x Series Programmers Guide Section 5.49 **************
 void Cmd_Scale(uint32_t sx, uint32_t sy)
 {
   Send_CMD(CMD_SCALE);
@@ -574,8 +579,7 @@ void Cmd_Flash_Fast(void)
   Send_CMD(0);
 }
 
-// *** Calibrate Touch Digitizer - FT81x Series Programmers Guide Section 5.52 ***********************************
-// * This business about "result" in the manual really seems to be simply leftover cruft of no purpose - send zero
+// *** Calibrate Touch Digitizer - FT81x Series Programmers Guide Section 5.52 *
 void Cmd_Calibrate(uint32_t result)
 {
   Send_CMD(CMD_CALIBRATE);
@@ -588,14 +592,15 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
 {
   uint32_t displayX[3], displayY[3];
   uint32_t touchX[3], touchY[3]; 
-  uint32_t touchValue = 0, storedValue = 0;  
+  uint32_t touchValue = 0;
   int32_t tmp, k;
   int32_t TransMatrix[6];
   uint8_t count = 0;
   uint8_t pressed = 0;
   char num[2];
+  const uint8_t numTouches = 3;
 
-  // These values determine where your calibration points will be drawn on your display
+// These values determine where your calibration points will be drawn on your display
   displayX[0] = (uint32_t) (Width * 0.15) + H_Offset;
   displayY[0] = (uint32_t) (Height * 0.15) + V_Offset;
   
@@ -605,7 +610,7 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
   displayX[2] = (uint32_t) (Width / 2) + H_Offset;
   displayY[2] = (uint32_t) (Height * 0.85) + V_Offset;
 
-  while (count < 3) 
+  while (count < numTouches) 
   {
     Send_CMD(CMD_DLSTART);
     Send_CMD(CLEAR_COLOR_RGB(0, 0, 0));	
@@ -618,7 +623,7 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
     Send_CMD(VERTEX2F((uint32_t)(displayX[count]) * 16, (uint32_t)((displayY[count])) * 16)); 
     Send_CMD(END());
     Send_CMD(COLOR_RGB(255, 255, 255));
-    Cmd_Text((Width / 2) + H_Offset, (Height / 3) + V_Offset, 27, OPT_CENTER, "Calibrating");
+    //Cmd_Text((Width / 2) + H_Offset, (Height / 3) + V_Offset, 27, OPT_CENTER, "Calibrating");
     Cmd_Text((Width / 2) + H_Offset, (Height / 2) + V_Offset, 27, OPT_CENTER, "Please tap the dots");
     //null terminated string of one character
     num[0] = count + 0x31; num[1] = 0;
@@ -631,26 +636,28 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
     //wait here until the coprocessor has read and executed every pending command.
     Wait4CoProFIFOEmpty();
 
-    while (pressed == count)
-    {
+    while (pressed == count) {
       //Read for any new touch tag inputs
       touchValue = rd32(REG_TOUCH_DIRECT_XY + RAM_REG);
-      if (!(touchValue & 0x80000000))
-      {
-        //Raw Touchscreen Y coordinate
+      if (0xFFFFFFFF != touchValue) {
+        //Raw Touchscreen X coordinate
         touchX[count] = (touchValue >> 16) & 0x03FF;
         //Raw Touchscreen Y coordinate
         touchY[count] = touchValue & 0x03FF;
 
-      count++;
+        count++;
       }
     }
+    HAL_Delay(2000);
     pressed = count;
-
   }
 
-  k = ((touchX[0] - touchX[2])*(touchY[1] - touchY[2])) - ((touchX[1] - touchX[2])*(touchY[0] - touchY[2]));
 
+  k = ((touchX[0] - touchX[2])*(touchY[1] - touchY[2])) - ((touchX[1] - touchX[2])*(touchY[0] - touchY[2]));
+  if (0 == k) {
+    printf("Could not calibrate\n\r");
+    return;
+  }
   tmp = (((displayX[0] - displayX[2]) * (touchY[1] - touchY[2])) - ((displayX[1] - displayX[2])*(touchY[0] - touchY[2])));
 
   TransMatrix[0] = (tmp << 16) / k;
@@ -673,18 +680,14 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
   count = 0;
   do
   {
-    wr32(REG_TOUCH_TRANSFORM_A + RAM_REG + (count * 4), TransMatrix[count]);  // Write to Eve config registers
+    //Write to Eve config registers
+    wr32(REG_TOUCH_TRANSFORM_A + RAM_REG + (count * 4), TransMatrix[count]);
 
-    uint16_t ValH = TransMatrix[count] >> 16;
-    uint16_t ValL = TransMatrix[count] & 0xFFFF;
-    
     count++;
   }while(count < 6);
 }
-// ***************************************************************************************************************
-// *** Animation functions ***************************************************************************************
-// ***************************************************************************************************************
 
+/****************************Animation functions******************************/
 void Cmd_AnimStart(int32_t ch, uint32_t aoptr, uint32_t loop)
 {
 	Send_CMD(CMD_ANIMSTART);

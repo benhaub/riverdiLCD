@@ -39,6 +39,7 @@ void startupScreen(uint8_t DotSize)
 	Send_CMD(CMD_SWAP);
   //Trigger the CoProcessor to start processing the FIFO
 	UpdateFIFO();
+	Wait4CoProFIFOEmpty();
 }
 
 
@@ -60,7 +61,6 @@ void ClearScreen(void)
 	UpdateFIFO();
   // wait here until the coprocessor has read and executed every pending command.	
 	Wait4CoProFIFOEmpty();
-	HAL_Delay(10);
 }
 
 int main()
@@ -82,14 +82,14 @@ int main()
   //using in the MatrixEveConf.h file
 #ifdef TOUCH_RESISTIVE
   Calibrate();
+  printf("Calibration done\r\n");
 #endif
 
   //Draw the Matrix Orbital Screen
   startupScreen(30);
   uint8_t pressed = 0;
 
-  while (1)
-  {
+while (1) {
     // Check for touches
     uint8_t Tag = rd8(REG_TOUCH_TAG + RAM_REG);
     switch (Tag)
@@ -111,7 +111,7 @@ int main()
         }
         break;
     }
-  }
+}
   HAL_Close();
   exit(1);
 }

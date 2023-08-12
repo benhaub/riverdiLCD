@@ -26,9 +26,10 @@ void HAL_SPI_WriteBuffer(uint8_t *Buffer, uint32_t Length) {
 }
 
 void HAL_SPI_ReadBuffer(uint8_t *Buffer, uint32_t Length) {
-  uint8_t dummyByte = 0x0;
+  const uint8_t dummyByte = 0x0;
+
   for (int i = 0; i < Length; i++) {
-    //After the dummy byte, BT81x responds to each host byte with read data bytes
+//After the dummy byte, BT81x responds to each host byte with read data bytes
     spi(SPI_TRANSMIT, &dummyByte);
     spi(SPI_RECEIVE, &Buffer[i]);
   }
@@ -39,9 +40,11 @@ void HAL_Delay(uint32_t milliseconds) {
 }
 
 void HAL_Eve_Reset_HW(void) {
+//Minimum time for PD to be held low is 5ms. Sect. 4.9.2
+  const uint32_t minimumPowerdownTimeMs = 6;
+
   gpio(GPIO_PORTE, PD_PIN_NUMBER, GPIO_STATE_OFF);
-  //Minimum time for PD to be held low is 5ms. Sect. 4.9.2
-  HAL_Delay(6);
+  HAL_Delay(minimumPowerdownTimeMs);
   gpio(GPIO_PORTE, PD_PIN_NUMBER, GPIO_STATE_ON);
 }
 
