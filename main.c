@@ -12,34 +12,34 @@
 void startupScreen(uint8_t DotSize)
 {
   //Start a new display list
-	Send_CMD(CMD_DLSTART);
+	sendCmd(CMD_DLSTART);
   //setup VERTEX2F to take pixel coordinates
-	Send_CMD(VERTEXFORMAT(0));
+	sendCmd(VERTEXFORMAT(0));
   //Determine the clear screen color
-	Send_CMD(CLEAR_COLOR_RGB(0, 0, 0));
+	sendCmd(CLEAR_COLOR_RGB(0, 0, 0));
   //Clear the screen and the current display list
-	Send_CMD(CLEAR(1, 1, 1));
+	sendCmd(CLEAR(1, 1, 1));
   // change colour to red
-	Send_CMD(COLOR_RGB(255, 0, 0));
-	Send_CMD(POINT_SIZE(DotSize * 16));
+	sendCmd(COLOR_RGB(255, 0, 0));
+	sendCmd(POINT_SIZE(DotSize * 16));
   // set point size to DotSize pixels. Points = (pixels x 16)
-	Send_CMD(BEGIN(POINTS));
+	sendCmd(BEGIN(POINTS));
   // start drawing point
-	Send_CMD(TAG(1));
+	sendCmd(TAG(1));
   //place point
-	Send_CMD(VERTEX2F(DWIDTH / 2, DHEIGHT / 2));
+	sendCmd(VERTEX2F(DWIDTH / 2, DHEIGHT / 2));
   //end drawing point
-	Send_CMD(END());
+	sendCmd(END());
   //Change color to white for text
-	Send_CMD(COLOR_RGB(255, 255, 255));
-	Cmd_Text(DWIDTH / 2, DHEIGHT / 2, 30, OPT_CENTER, " TM4C_OS ");
+	sendCmd(COLOR_RGB(255, 255, 255));
+	Cmd_Text(DWIDTH / 2, DHEIGHT / 2, 30, OPT_CENTER, "TM4C_OS");
   //End the display list
-	Send_CMD(DISPLAY());
+	sendCmd(DISPLAY());
   //Swap commands into RAM
-	Send_CMD(CMD_SWAP);
+	sendCmd(CMD_SWAP);
   //Trigger the CoProcessor to start processing the FIFO
-	UpdateFIFO();
-	Wait4CoProFIFOEmpty();
+	updateFifo();
+	//isCoProFifoEmpty();
 }
 
 
@@ -52,15 +52,15 @@ void Calibrate(void)
 // A Clear screen function 
 void ClearScreen(void)
 {
-	Send_CMD(CMD_DLSTART);
-	Send_CMD(CLEAR_COLOR_RGB(0, 0, 0));
-	Send_CMD(CLEAR(1, 1, 1));
-	Send_CMD(DISPLAY());
-	Send_CMD(CMD_SWAP);
+	sendCmd(CMD_DLSTART);
+	sendCmd(CLEAR_COLOR_RGB(0, 0, 0));
+	sendCmd(CLEAR(1, 1, 1));
+	sendCmd(DISPLAY());
+	sendCmd(CMD_SWAP);
   // Trigger the CoProcessor to start processing commands out of the FIFO
-	UpdateFIFO();
+	updateFifo();
   // wait here until the coprocessor has read and executed every pending command.	
-	Wait4CoProFIFOEmpty();
+	isCoProFifoEmpty();
 }
 
 int main()
@@ -70,46 +70,35 @@ int main()
   HAL_Open();
 
   //Initialize the EVE graphics controller. Make sure to define which display you are using in the MatrixEveConf.h
-  while (!(chipId = FT81x_Init()));
+  while (!(chipId = bt81xInit()));
   printf("Chip ID = %x\n\r", chipId);
 
   //Clear any remnants in the RAM
 	ClearScreen();
 
-  printf("Done initializing bt81x.\n\r");
-
   //If you are using a touch screen, make sure to define what variant you are
   //using in the MatrixEveConf.h file
 #ifdef TOUCH_RESISTIVE
   Calibrate();
-  printf("Calibration done\r\n");
 #endif
 
-  //Draw the Matrix Orbital Screen
   startupScreen(30);
+  //Draw the Matrix Orbital Screen
   uint8_t pressed = 0;
+  uint32_t tag = 0;
 
 while (1) {
-    // Check for touches
-    uint8_t Tag = rd8(REG_TOUCH_TAG + RAM_REG);
-    switch (Tag)
-    {
-      case 1:
-        if (!pressed)
-        {
-          //Blue dot is 120 when not touched
-          startupScreen(120);
-          pressed = 1;
-        }
-        break;
-      default:
-        if (pressed)
-        {
-          pressed = 0;
-          //Blue dot size is 30 when not touched
-          startupScreen(30);
-        }
-        break;
+    // Check for touches on the red circle
+    //tag = rd8(REG_TOUCH_TAG + RAM_REG);
+    tag = rd32(REG_TOUCH_DIRECT_XY + RAM_REG);
+
+    if ((tag & 1<<31) && pressed) {
+      pressed = 0;
+      startupScreen(30);
+    }
+    else if (!(tag & 1<<31)) {
+      pressed = 1;
+      startupScreen(120);
     }
 }
   HAL_Close();

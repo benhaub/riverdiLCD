@@ -377,18 +377,18 @@ extern "C" {
 extern uint16_t FifoWriteLocation;
 
 // Function Prototypes
-uint32_t FT81x_Init(void);
+uint32_t bt81xInit(void);
 void Cap_Touch_Upload(void);
 
-void HostCommand(uint8_t HostCommand, uint8_t parameter); 
+void hostCommand(uint8_t hostCommand, uint8_t parameter); 
 void wr32(uint32_t address, uint32_t parameter);
 void wr16(uint32_t, uint16_t parameter);
 void wr8(uint32_t, uint8_t parameter);
 uint8_t rd8(uint32_t RegAddr);
 uint16_t rd16(uint32_t RegAddr);
 uint32_t rd32(uint32_t RegAddr);
-void Send_CMD(uint32_t data);
-void UpdateFIFO(void);
+void sendCmd(uint32_t data);
+void updateFifo(void);
 bool readRegId(void);
 
 // Widgets and other significant screen objects
@@ -425,10 +425,10 @@ void Calibrate_Manual(uint16_t Width, uint16_t Height, uint16_t V_Offset, uint16
 
 uint16_t CoProFIFO_FreeSpace(void);
 void Wait4CoProFIFO(uint32_t room);
-void Wait4CoProFIFOEmpty(void);
+void isCoProFifoEmpty(void);
 void StartCoProTransfer(uint32_t address, uint8_t reading);
 void CoProWrCmdBuf(const uint8_t *buffer, uint32_t count);
-void CoProFaultRecovery();
+void coProFaultRecovery();
 uint32_t WriteBlockRAM(uint32_t Add, const uint8_t *buff, uint32_t count);
 int32_t CalcCoef(int32_t Q, int32_t K);
 uint32_t Display_Width();
